@@ -1,5 +1,21 @@
 # EC2 Deployment Checklist
 
+## Documentation Index
+> Refer to these docs to revise any concept.
+
+| File | What it covers |
+|---|---|
+| [01-docker-basics.md](01-docker-basics.md) | What Docker is, images, containers, Dockerfile, volumes, layer caching |
+| [02-docker-compose.md](02-docker-compose.md) | Compose concepts, every line of dev + prod config explained |
+| [03-nginx.md](03-nginx.md) | What Nginx does, nginx.conf explained, React Router fallback |
+| [04-dev-workflow.md](04-dev-workflow.md) | How to run locally, hot reload, env vars, common issues |
+| [05-ec2-deployment.md](05-ec2-deployment.md) | EC2 concepts, security groups, full deployment steps |
+| [06-git-basics.md](06-git-basics.md) | Git fundamentals, GitHub, gitignore, deployment flow |
+| [07-node-middleware-auth.md](07-node-middleware-auth.md) | Node event loop, Express, middleware, JWT, bcrypt, auth flow |
+| [08-worker-threads.md](08-worker-threads.md) | Why workers, blocking vs non-blocking, implementation, UI demo |
+
+---
+
 ## One-time setup
 > These steps only need to be done once when setting up a new server.
 
