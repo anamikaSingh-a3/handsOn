@@ -1,0 +1,30 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH into EC2 and deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/handsOn
+
+            # Write .env file from GitHub secret
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" > .env
+            echo "MONGO_URI=mongodb://mongo:27017/myApp" >> .env
+
+            # Pull latest code
+            git pull origin main
+
+            # Rebuild and restart containers
+            docker compose -f docker-compose.prod.yml up -d --build
