@@ -13,9 +13,11 @@ GitHub detects the push
       ↓
 GitHub Actions spins up a temporary runner (VM)
       ↓
-Runner SSHs into your EC2
+Did frontend/ files change?
+  ├── YES → build React (npm run build) → copy dist/ to EC2
+  └── NO  → skip build and copy
       ↓
-git pull + docker compose up --build
+SSH into EC2 → git pull + docker compose up --build
 ```
 
 ---
@@ -104,8 +106,47 @@ jobs:
     runs-on: ubuntu-latest    # GitHub spins up a fresh Ubuntu VM
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2        # fetch last 2 commits so we can diff what changed
+
+      - name: Check for frontend changes
+        id: frontend-changes
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q '^frontend/'; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+        # Compares this commit to the previous one
+        # Sets output variable changed=true/false
+
+      - name: Build frontend
+        if: steps.frontend-changes.outputs.changed == 'true'
+        run: |
+          cd frontend
+          npm install
+          npm run build
+        # Only runs if frontend files changed
+        # Generates frontend/dist/ — no need to commit dist/ to git
+
+      - name: Copy dist to EC2
+        if: steps.frontend-changes.outputs.changed == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        # Only runs if frontend files changed
+        # Transfers built dist/ to EC2 via scp
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "frontend/dist/"
+          target: "~/handsOn/frontend/"
+          strip_components: 1
+
       - name: SSH into EC2 and deploy
-        uses: appleboy/ssh-action@v1.0.3    # handles SSH for us
+        uses: appleboy/ssh-action@v1.0.3
+        # Always runs — backend always needs to be redeployed
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
@@ -124,23 +165,53 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-### What each part does:
+### What each step does:
 
-**`on: push: branches: main`**
-Only runs when code is pushed to `main`. Feature branches don't trigger a deploy.
+**`Checkout code`**
+Clones your repo onto the GitHub runner VM. `fetch-depth: 2` fetches the last 2 commits so we can compare what changed.
 
-**`runs-on: ubuntu-latest`**
-GitHub provides a temporary VM to run the workflow. It's not your EC2 — it's GitHub's infrastructure.
+**`Check for frontend changes`**
+Diffs the current commit against the previous one. If any file inside `frontend/` changed, it sets `changed=true`. This output is used by the next two steps.
 
-**`appleboy/ssh-action`**
-A pre-built GitHub Action that handles the SSH connection. You pass it your secrets and the commands to run.
+**`Build frontend`** _(runs only if frontend changed)_
+Runs `npm install && npm run build` on the runner. Generates `frontend/dist/` — the compiled React app ready to be served by Nginx.
 
-**`script`**
-These commands run on your EC2 instance over SSH:
-1. Navigate to the project directory
-2. Recreate the `.env` file with secrets from GitHub
-3. Pull latest code from main
-4. Rebuild Docker images and restart containers
+**`Copy dist to EC2`** _(runs only if frontend changed)_
+Uses `scp` (secure copy) to transfer the built `dist/` folder from the runner to your EC2. This is why you don't need to commit `dist/` to git.
+
+**`SSH into EC2 and deploy`** _(always runs)_
+SSHs into EC2 and:
+
+1. Recreates the `.env` file with secrets from GitHub
+2. Pulls latest code from main
+3. Rebuilds Docker images and restarts containers
+
+---
+
+### When does each step run?
+
+| Push contains | Build frontend | Copy dist | Deploy  |
+| ------------- | -------------- | --------- | ------- |
+| Backend only  | No             | No        | Yes     |
+| Frontend only | Yes            | Yes       | Yes     |
+| Both          | Yes            | Yes       | Yes     |
+
+---
+
+## Removing `frontend/dist` from git
+
+Since the CI/CD pipeline now builds and copies `dist/` automatically, you don't need it in git.
+
+```bash
+# Remove from git tracking (keeps files on disk)
+git rm -r --cached frontend/dist
+
+# Add to .gitignore so it's never tracked again
+echo "frontend/dist" >> .gitignore
+
+git add .gitignore
+git commit -m "remove frontend/dist from git tracking"
+```
 
 ---
 

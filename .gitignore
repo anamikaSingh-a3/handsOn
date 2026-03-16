@@ -1,4 +1,5 @@
 /handson/.gitignore
 node_modules/
 .env
-# frontend/dist/
+# frontend/dist/frontend/dist
+frontend/dist
