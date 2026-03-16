@@ -87,7 +87,7 @@ export default function Dashboard() {
     <div style={s.page}>
 
       <div style={s.header}>
-        <h2 style={s.title}>Blocking vs Worker Thread</h2>
+        <h2 style={s.title}>Blocking VS Worker Thread</h2>
         <button style={s.logoutBtn} onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}>
           Logout
         </button>
